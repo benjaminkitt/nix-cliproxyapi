@@ -202,8 +202,14 @@ in
         # Ensure data directory exists
         mkdir -p ${cfg.dataDir}
 
-        # Copy example config if no config exists and none specified
-        if [ ! -f ${cfg.dataDir}/config.yaml ] && [ -z "${toString cfg.configFile}" ]; then
+        # Copy example config template (needed for remote storage bootstrapping)
+        if [ -f ${cfg.package}/share/cliproxyapi/config.example.yaml ]; then
+          cp -f ${cfg.package}/share/cliproxyapi/config.example.yaml ${cfg.dataDir}/config.example.yaml
+          chmod 600 ${cfg.dataDir}/config.example.yaml
+        fi
+
+        # Copy example config as config.yaml if no config exists and using local storage
+        if [ ! -f ${cfg.dataDir}/config.yaml ] && [ -z "${toString cfg.configFile}" ] && [ "${cfg.storage.type}" = "local" ]; then
           if [ -f ${cfg.package}/share/cliproxyapi/config.example.yaml ]; then
             cp ${cfg.package}/share/cliproxyapi/config.example.yaml ${cfg.dataDir}/config.yaml
             chmod 600 ${cfg.dataDir}/config.yaml
