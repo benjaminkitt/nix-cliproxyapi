@@ -1,0 +1,97 @@
+name: Update CLIProxyAPI Version
+
+on:
+  schedule:
+    # Run daily at 6 AM UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Specific version to update to (leave empty for latest)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-update:
+    runs-on: ubuntu-latest
+    outputs:
+      needs_update: ${{ steps.check.outputs.needs_update }}
+      new_version: ${{ steps.check.outputs.new_version }}
+      current_version: ${{ steps.check.outputs.current_version }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for new version
+        id: check
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          # Get current version from flake.nix
+          CURRENT_VERSION=$(grep -oP 'version = "\K[^"]+' flake.nix | head -1)
+          echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+
+          # Get latest or specified version
+          if [ -n "$INPUT_VERSION" ]; then
+            NEW_VERSION="$INPUT_VERSION"
+          else
+            NEW_VERSION=$(curl -s https://api.github.com/repos/router-for-me/CLIProxyAPI/releases/latest | jq -r '.tag_name' | sed 's/^v//')
+          fi
+          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+
+          # Check if update is needed
+          if [ "$CURRENT_VERSION" != "$NEW_VERSION" ]; then
+            echo "needs_update=true" >> "$GITHUB_OUTPUT"
+            echo "Update needed: $CURRENT_VERSION -> $NEW_VERSION"
+          else
+            echo "needs_update=false" >> "$GITHUB_OUTPUT"
+            echo "Already at latest version: $CURRENT_VERSION"
+          fi
+
+  update-flake:
+    runs-on: ubuntu-latest
+    needs: check-update
+    if: needs.check-update.outputs.needs_update == 'true'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Update version and hashes
+        id: update
+        env:
+          NEW_VERSION: ${{ needs.check-update.outputs.new_version }}
+        run: |
+          chmod +x scripts/update-version.sh
+          ./scripts/update-version.sh "$NEW_VERSION"
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update CLIProxyAPI to v${{ needs.check-update.outputs.new_version }}"
+          title: "chore: update CLIProxyAPI to v${{ needs.check-update.outputs.new_version }}"
+          body: |
+            Automated update of CLIProxyAPI from v${{ needs.check-update.outputs.current_version }} to v${{ needs.check-update.outputs.new_version }}.
+
+            **Release notes:** https://github.com/router-for-me/CLIProxyAPI/releases/tag/v${{ needs.check-update.outputs.new_version }}
+
+            ---
+            *This PR was automatically created by the update workflow.*
+          branch: update/cliproxyapi-${{ needs.check-update.outputs.new_version }}
+          delete-branch: true
+          labels: |
+            automated
+            dependencies
