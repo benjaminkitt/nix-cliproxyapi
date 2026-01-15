@@ -221,7 +221,6 @@ in
         User = cfg.user;
         Group = cfg.group;
         WorkingDirectory = cfg.dataDir;
-        ExecStart = "${cfg.package}/bin/cliproxyapi";
         Restart = "on-failure";
         RestartSec = 5;
 
