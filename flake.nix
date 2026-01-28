@@ -17,12 +17,12 @@
       ];
 
       # Version and hash information (updated by GitHub Action)
-      version = "6.6.109";
+      version = "6.7.27";
       hashes = {
-        "x86_64-linux" = "sha256-BnmwGOfJklw0Z76u5+AqrjO8rhHKSq3XnEWIRnS03IY=";
-        "aarch64-linux" = "sha256-21ukewFCjjsy8hqNL2tOD4HuDhubNgPDQ0LJ+1ZKBkI=";
-        "x86_64-darwin" = "sha256-dtsj87fq2QUBm96xcy7rh+Q0oKoMEwjPPleEq51t8+Y=";
-        "aarch64-darwin" = "sha256-BpxnL3keMLY8DR7Lazq+rjAZKme1JjcOUz/KJ7TptNo=";
+        "x86_64-linux" = "sha256-yPtCDaRPcAT60hv24zkUKfAmcKL8AByw/JQP8SZQZns=";
+        "aarch64-linux" = "sha256-+VbOJZ3C4Sw4tuvGLqas2wg5qYeyN0Hovd6hAKAebkc=";
+        "x86_64-darwin" = "sha256-xtQY4KOHagZ3ZOtPnJ+MdrEuCs9wMbF1U2kkT69vHc4=";
+        "aarch64-darwin" = "sha256-+07rjlBsZhicCEWSTeffMzZU8kOEHbZOvMv/T1qXVkA=";
       };
 
       # Map Nix system to release asset naming
