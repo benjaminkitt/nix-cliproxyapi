@@ -1,6 +1,8 @@
 # nix-cliproxyapi
 
-Nix flake for [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) - an AI CLI proxy service providing OpenAI/Gemini/Claude compatible API.
+Nix flake for CLIProxyAPI editions - AI CLI proxy services providing OpenAI/Gemini/Claude compatible APIs.
+
+Available editions: **CLIProxyAPI** (base), **CLIProxyAPIPlus** (third-party providers), **CLIProxyAPIBusiness** (enterprise features).
 
 ## Features
 
@@ -10,12 +12,29 @@ Nix flake for [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) - an A
 - Optional storage backends: Git, PostgreSQL, S3
 - Automatic version updates via GitHub Actions
 
+## Editions
+
+| Package | Description | License | Default Port |
+|---------|-------------|---------|--------------|
+| `cliproxyapi` | Base AI CLI proxy (OpenAI/Gemini/Claude compatible) | MIT | 8317 |
+| `cliproxyapi-plus` | Base + third-party providers (Copilot, Kiro) | MIT | 8317 |
+| `cliproxyapi-business` | Full business edition (user mgmt, billing, web UI, DB support) | SSPL | 8318 |
+
+All editions install their binary as `cliproxyapi`, making them interchangeable in NixOS/darwin modules.
+
 ## Quick Start
 
 ### Try it out
 
 ```bash
+# Run base edition
 nix run github:benjaminkitt/nix-cliproxyapi
+
+# Run plus edition
+nix run github:benjaminkitt/nix-cliproxyapi#cliproxyapi-plus
+
+# Run business edition
+nix run github:benjaminkitt/nix-cliproxyapi#cliproxyapi-business
 ```
 
 ### Add to your flake
@@ -55,6 +74,25 @@ This will:
 - Create `/var/lib/cliproxyapi` for data storage
 - Copy `config.example.yaml` to the data directory on first run
 - Start the service on port 8317
+
+### Using Plus or Business Edition
+
+To use a different edition, override the package:
+
+```nix
+{ inputs, pkgs, ... }:
+
+{
+  imports = [ inputs.cliproxyapi.nixosModules.default ];
+
+  services.cliproxyapi = {
+    enable = true;
+    package = inputs.cliproxyapi.packages.${pkgs.system}.cliproxyapi-business;
+    port = 8318;  # Business edition default port
+    openFirewall = true;
+  };
+}
+```
 
 ### Custom Config File
 
@@ -194,13 +232,18 @@ See the [CLIProxyAPI documentation](https://help.router-for.me/) for configurati
 
 ## Using the Overlay
 
-You can also use the package via the overlay:
+You can also use the packages via the overlay:
 
 ```nix
 {
   nixpkgs.overlays = [ inputs.cliproxyapi.overlays.default ];
 
-  environment.systemPackages = [ pkgs.cliproxyapi ];
+  # All three packages are available:
+  environment.systemPackages = [
+    pkgs.cliproxyapi            # Base edition
+    # pkgs.cliproxyapi-plus     # Plus edition
+    # pkgs.cliproxyapi-business # Business edition
+  ];
 }
 ```
 
@@ -208,11 +251,17 @@ You can also use the package via the overlay:
 
 This repository includes a GitHub Action that checks for new CLIProxyAPI releases daily and creates PRs with updated version and hashes.
 
+The workflow checks each edition independently using a matrix strategy, creating separate PRs for each edition when updates are available.
+
 To manually trigger an update:
 1. Go to Actions -> "Update CLIProxyAPI Version"
-2. Click "Run workflow"
+2. Select the edition from the dropdown
 3. Optionally specify a version, or leave empty for latest
 
 ## License
 
-MIT License - see [LICENSE](LICENSE)
+The packaging code in this repository is licensed under MIT - see [LICENSE](LICENSE).
+
+Upstream licenses vary by edition:
+- **CLIProxyAPI** and **CLIProxyAPIPlus**: MIT License
+- **CLIProxyAPIBusiness**: SSPL-1.0 (Server Side Public License)
