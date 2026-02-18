@@ -42,27 +42,27 @@
           homepage = "https://github.com/router-for-me/CLIProxyAPI";
         };
         cliproxyapi-plus = {
-          version = "0.0.0";  # Placeholder until real update
+          version = "6.8.18-1";
           hashes = {
-            "x86_64-linux" = nixpkgs.lib.fakeHash;
-            "aarch64-linux" = nixpkgs.lib.fakeHash;
-            "x86_64-darwin" = nixpkgs.lib.fakeHash;
-            "aarch64-darwin" = nixpkgs.lib.fakeHash;
+            "x86_64-linux" = "sha256-3nPxgSHpJBn/eWVlnCN4vL6ZkhLbCHSb2p1gUPRZpBg=";
+            "aarch64-linux" = "sha256-e/Ec1MWwClWFeu1MdPlPg0IDTR6WUMH1mh9eiCGm4tw=";
+            "x86_64-darwin" = "sha256-VOOTBv21daduxUsJ++HyfbIP/RNTsoPGow0JSGL0A0o=";
+            "aarch64-darwin" = "sha256-XDKRA5hMTAe8pVaGdLWShyWVWfgpzHKC0GiDjgPJLRc=";
           };
           repo = "router-for-me/CLIProxyAPIPlus";
-          archivePrefix = "cli-proxy-api-plus";
+          archivePrefix = "CLIProxyAPIPlus";
           binaryName = "cli-proxy-api-plus";
           license = pkgs: pkgs.lib.licenses.mit;
           description = "AI CLI proxy service (Plus edition) with enhanced features";
           homepage = "https://github.com/router-for-me/CLIProxyAPIPlus";
         };
         cliproxyapi-business = {
-          version = "0.0.0";  # Placeholder until real update
+          version = "2026.7.1";
           hashes = {
-            "x86_64-linux" = nixpkgs.lib.fakeHash;
-            "aarch64-linux" = nixpkgs.lib.fakeHash;
-            "x86_64-darwin" = nixpkgs.lib.fakeHash;
-            "aarch64-darwin" = nixpkgs.lib.fakeHash;
+            "x86_64-linux" = "sha256-rj4OKQfTOhhilopj6ma8XrtHc/8rS6m4Cq9y9i2IzmM=";
+            "aarch64-linux" = "sha256-/07ItHaIwa63oEGcTFV78Vk0m1xuuCOFi+8HKIq5dJ8=";
+            "x86_64-darwin" = "sha256-/NOGwZuqBHJ4o1wKAI+bffCAfN9/A9TvPTU63IHcyqk=";
+            "aarch64-darwin" = "sha256-jkJySOdbJR6xhNXOkmezHF7CUGXgRNugT7NYtUMzi4E=";
           };
           repo = "router-for-me/CLIProxyAPIBusiness";
           archivePrefix = "cpab";

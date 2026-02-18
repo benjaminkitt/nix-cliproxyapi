@@ -1,16 +1,47 @@
 #!/usr/bin/env bash
-# Script to update CLIProxyAPI version and compute new hashes
+# Script to update CLIProxyAPI edition version and compute new hashes
 set -euo pipefail
 
-NEW_VERSION="${1:-}"
+EDITION="${1:-}"
+NEW_VERSION="${2:-}"
 
-if [ -z "$NEW_VERSION" ]; then
-    echo "Usage: $0 <version>"
-    echo "Example: $0 6.6.109"
+# Edition metadata (must match flake.nix editions attrset)
+declare -A REPOS=(
+    ["cliproxyapi"]="router-for-me/CLIProxyAPI"
+    ["cliproxyapi-plus"]="router-for-me/CLIProxyAPIPlus"
+    ["cliproxyapi-business"]="router-for-me/CLIProxyAPIBusiness"
+)
+
+declare -A ARCHIVE_PREFIXES=(
+    ["cliproxyapi"]="CLIProxyAPI"
+    ["cliproxyapi-plus"]="CLIProxyAPIPlus"
+    ["cliproxyapi-business"]="cpab"
+)
+
+# Usage help
+if [ -z "$EDITION" ] || [ -z "$NEW_VERSION" ]; then
+    echo "Usage: $0 <edition> <version>"
+    echo ""
+    echo "Editions:"
+    echo "  cliproxyapi          - Base CLIProxyAPI"
+    echo "  cliproxyapi-plus     - CLIProxyAPI Plus edition"
+    echo "  cliproxyapi-business - CLIProxyAPI Business edition"
+    echo ""
+    echo "Example: $0 cliproxyapi-plus 6.6.68-0"
     exit 1
 fi
 
-echo "Updating to version: $NEW_VERSION"
+# Validate edition
+if [[ ! -v "REPOS[$EDITION]" ]]; then
+    echo "Error: Unknown edition '$EDITION'"
+    echo "Valid editions: ${!REPOS[*]}"
+    exit 1
+fi
+
+REPO="${REPOS[$EDITION]}"
+ARCHIVE_PREFIX="${ARCHIVE_PREFIXES[$EDITION]}"
+
+echo "Updating $EDITION to version: $NEW_VERSION"
 
 # Define platforms
 declare -A PLATFORMS=(
@@ -25,7 +56,7 @@ declare -A HASHES
 
 for nixSystem in "${!PLATFORMS[@]}"; do
     asset="${PLATFORMS[$nixSystem]}"
-    url="https://github.com/router-for-me/CLIProxyAPI/releases/download/v${NEW_VERSION}/CLIProxyAPI_${NEW_VERSION}_${asset}.tar.gz"
+    url="https://github.com/${REPO}/releases/download/v${NEW_VERSION}/${ARCHIVE_PREFIX}_${NEW_VERSION}_${asset}.tar.gz"
 
     echo "Fetching hash for $nixSystem ($asset)..."
 
@@ -45,17 +76,21 @@ done
 echo ""
 echo "Updating flake.nix..."
 
-# Update version
-sed -i 's/version = "[^"]*"/version = "'"${NEW_VERSION}"'"/' flake.nix
+# Update version within the specific edition block using multiline perl
+# The /s modifier allows . to match newlines
+# Use environment variables to avoid shell escaping issues with version strings
+export EDITION NEW_VERSION
+perl -i -0pe 's/($ENV{EDITION} = \{[^}]*?)version = "[^"]*"/$1version = "$ENV{NEW_VERSION}"/s' flake.nix
 
-# Update hashes using a different approach - use | as delimiter and escape properly
+# Update each hash within the specific edition block
+# Match both quoted strings ("sha256-...") and Nix expressions (nixpkgs.lib.fakeHash)
 for nixSystem in "${!HASHES[@]}"; do
     hash="${HASHES[$nixSystem]}"
-    # Use perl for more reliable replacement
-    perl -i -pe "s|\"${nixSystem}\" = \"sha256-[^\"]*\"|\"${nixSystem}\" = \"${hash}\"|" flake.nix
+    export nixSystem hash
+    perl -i -0pe 's/($ENV{EDITION} = \{.*?hashes = \{.*?)"$ENV{nixSystem}" = [^;]+;/$1"$ENV{nixSystem}" = "$ENV{hash}";/s' flake.nix
 done
 
-echo "Done! Updated flake.nix to version $NEW_VERSION"
+echo "Done! Updated flake.nix $EDITION to version $NEW_VERSION"
 echo ""
-echo "Changes:"
-grep -A 6 "hashes = {" flake.nix
+echo "Changes for $EDITION:"
+grep -A 10 "${EDITION} = {" flake.nix | head -11
