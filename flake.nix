@@ -16,15 +16,6 @@
         "aarch64-darwin"
       ];
 
-      # Version and hash information (updated by GitHub Action)
-      version = "6.8.18";
-      hashes = {
-        "x86_64-linux" = "sha256-zzYEMbphablHpi4yUkmlaPtz3I/TGRojgxJriryKxmQ=";
-        "aarch64-linux" = "sha256-KUj3+TWQfJ1Fma9h29rCcaznbCJY2NmnOH1fukfHnqA=";
-        "x86_64-darwin" = "sha256-zZNYXhces77ADwZJjzKUO+hk31eUhJkRZ6dUJcF2WPo=";
-        "aarch64-darwin" = "sha256-ny7wvcATj7YAWuJbsq5hsn4bso3Y263IBCO6jy5ZVFQ=";
-      };
-
       # Map Nix system to release asset naming
       systemToAsset = system: {
         "x86_64-linux" = "linux_amd64";
@@ -33,18 +24,67 @@
         "aarch64-darwin" = "darwin_arm64";
       }.${system};
 
-      # Package builder for each system
-      mkPackage = pkgs: system:
+      # Edition metadata (updated by GitHub Action per edition)
+      editions = {
+        cliproxyapi = {
+          version = "6.8.18";
+          hashes = {
+            "x86_64-linux" = "sha256-zzYEMbphablHpi4yUkmlaPtz3I/TGRojgxJriryKxmQ=";
+            "aarch64-linux" = "sha256-KUj3+TWQfJ1Fma9h29rCcaznbCJY2NmnOH1fukfHnqA=";
+            "x86_64-darwin" = "sha256-zZNYXhces77ADwZJjzKUO+hk31eUhJkRZ6dUJcF2WPo=";
+            "aarch64-darwin" = "sha256-ny7wvcATj7YAWuJbsq5hsn4bso3Y263IBCO6jy5ZVFQ=";
+          };
+          repo = "router-for-me/CLIProxyAPI";
+          archivePrefix = "CLIProxyAPI";
+          binaryName = "cli-proxy-api";
+          license = pkgs: pkgs.lib.licenses.mit;
+          description = "AI CLI proxy service providing OpenAI/Gemini/Claude compatible API";
+          homepage = "https://github.com/router-for-me/CLIProxyAPI";
+        };
+        cliproxyapi-plus = {
+          version = "0.0.0";  # Placeholder until real update
+          hashes = {
+            "x86_64-linux" = nixpkgs.lib.fakeHash;
+            "aarch64-linux" = nixpkgs.lib.fakeHash;
+            "x86_64-darwin" = nixpkgs.lib.fakeHash;
+            "aarch64-darwin" = nixpkgs.lib.fakeHash;
+          };
+          repo = "router-for-me/CLIProxyAPIPlus";
+          archivePrefix = "cli-proxy-api-plus";
+          binaryName = "cli-proxy-api-plus";
+          license = pkgs: pkgs.lib.licenses.mit;
+          description = "AI CLI proxy service (Plus edition) with enhanced features";
+          homepage = "https://github.com/router-for-me/CLIProxyAPIPlus";
+        };
+        cliproxyapi-business = {
+          version = "0.0.0";  # Placeholder until real update
+          hashes = {
+            "x86_64-linux" = nixpkgs.lib.fakeHash;
+            "aarch64-linux" = nixpkgs.lib.fakeHash;
+            "x86_64-darwin" = nixpkgs.lib.fakeHash;
+            "aarch64-darwin" = nixpkgs.lib.fakeHash;
+          };
+          repo = "router-for-me/CLIProxyAPIBusiness";
+          archivePrefix = "cpab";
+          binaryName = "cpab";
+          license = pkgs: pkgs.lib.licenses.sspl;
+          description = "AI CLI proxy service (Business edition) for enterprise use";
+          homepage = "https://github.com/router-for-me/CLIProxyAPIBusiness";
+        };
+      };
+
+      # Package builder for each system and edition
+      mkPackage = pkgs: system: editionName: edition:
         let
           asset = systemToAsset system;
         in
         pkgs.stdenv.mkDerivation {
-          pname = "cliproxyapi";
-          inherit version;
+          pname = editionName;
+          version = edition.version;
 
           src = pkgs.fetchurl {
-            url = "https://github.com/router-for-me/CLIProxyAPI/releases/download/v${version}/CLIProxyAPI_${version}_${asset}.tar.gz";
-            hash = hashes.${system};
+            url = "https://github.com/${edition.repo}/releases/download/v${edition.version}/${edition.archivePrefix}_${edition.version}_${asset}.tar.gz";
+            hash = edition.hashes.${system};
           };
 
           sourceRoot = ".";
@@ -55,7 +95,7 @@
             runHook preInstall
 
             mkdir -p $out/bin
-            cp cli-proxy-api $out/bin/cliproxyapi
+            cp ${edition.binaryName} $out/bin/cliproxyapi
 
             # Install the example config for reference
             mkdir -p $out/share/cliproxyapi
@@ -67,9 +107,9 @@
           '';
 
           meta = with pkgs.lib; {
-            description = "AI CLI proxy service providing OpenAI/Gemini/Claude compatible API";
-            homepage = "https://github.com/router-for-me/CLIProxyAPI";
-            license = licenses.mit;
+            description = edition.description;
+            homepage = edition.homepage;
+            license = edition.license pkgs;
             platforms = supportedSystems;
             mainProgram = "cliproxyapi";
           };
@@ -81,17 +121,11 @@
         pkgs = import nixpkgs { inherit system; };
       in
       {
-        packages = {
-          cliproxyapi = mkPackage pkgs system;
-          default = self.packages.${system}.cliproxyapi;
-        };
+        packages = builtins.mapAttrs (name: edition: mkPackage pkgs system name edition) editions
+          // { default = self.packages.${system}.cliproxyapi; };
 
-        apps = {
-          cliproxyapi = flake-utils.lib.mkApp {
-            drv = self.packages.${system}.cliproxyapi;
-          };
-          default = self.apps.${system}.cliproxyapi;
-        };
+        apps = builtins.mapAttrs (name: pkg: flake-utils.lib.mkApp { drv = pkg; }) self.packages.${system}
+          // { default = self.apps.${system}.cliproxyapi; };
       }
     ) // {
       # NixOS module
@@ -107,8 +141,9 @@
       };
 
       # Overlay for use with nixpkgs
-      overlays.default = final: prev: {
-        cliproxyapi = self.packages.${prev.system}.cliproxyapi;
-      };
+      overlays.default = final: prev:
+        builtins.mapAttrs (name: edition:
+          self.packages.${prev.system}.${name}
+        ) editions;
     };
 }
