@@ -118,13 +118,13 @@
     in
     flake-utils.lib.eachSystem supportedSystems (system:
       let
-        pkgs = import nixpkgs { inherit system; };
+        pkgs = import nixpkgs { inherit system; config.allowUnfree = true; };
       in
       {
         packages = builtins.mapAttrs (name: edition: mkPackage pkgs system name edition) editions
           // { default = self.packages.${system}.cliproxyapi; };
 
-        apps = builtins.mapAttrs (name: pkg: flake-utils.lib.mkApp { drv = pkg; }) self.packages.${system}
+        apps = builtins.mapAttrs (name: pkg: flake-utils.lib.mkApp { drv = pkg; name = "cliproxyapi"; }) self.packages.${system}
           // { default = self.apps.${system}.cliproxyapi; };
       }
     ) // {
