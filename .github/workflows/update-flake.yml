@@ -6,8 +6,17 @@ on:
     - cron: '0 6 * * *'
   workflow_dispatch:
     inputs:
+      edition:
+        description: 'Edition to update (empty = all)'
+        required: false
+        type: choice
+        options:
+          - ''
+          - 'cliproxyapi'
+          - 'cliproxyapi-plus'
+          - 'cliproxyapi-business'
       version:
-        description: 'Specific version to update to (leave empty for latest)'
+        description: 'Specific version (only used with specific edition)'
         required: false
         type: string
 
@@ -16,47 +25,102 @@ permissions:
   pull-requests: write
 
 jobs:
-  check-update:
+  check-updates:
     runs-on: ubuntu-latest
     outputs:
-      needs_update: ${{ steps.check.outputs.needs_update }}
-      new_version: ${{ steps.check.outputs.new_version }}
-      current_version: ${{ steps.check.outputs.current_version }}
+      matrix: ${{ steps.check.outputs.matrix }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Check for new version
+      - name: Check for updates
         id: check
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_EDITION: ${{ inputs.edition }}
           INPUT_VERSION: ${{ inputs.version }}
         run: |
-          # Get current version from flake.nix
-          CURRENT_VERSION=$(grep -oP 'version = "\K[^"]+' flake.nix | head -1)
-          echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+          # Edition-to-repo mapping (must match update-version.sh)
+          declare -A REPOS=(
+              ["cliproxyapi"]="router-for-me/CLIProxyAPI"
+              ["cliproxyapi-plus"]="router-for-me/CLIProxyAPIPlus"
+              ["cliproxyapi-business"]="router-for-me/CLIProxyAPIBusiness"
+          )
 
-          # Get latest or specified version
-          if [ -n "$INPUT_VERSION" ]; then
-            NEW_VERSION="$INPUT_VERSION"
-          else
-            NEW_VERSION=$(curl -s https://api.github.com/repos/router-for-me/CLIProxyAPI/releases/latest | jq -r '.tag_name' | sed 's/^v//')
-          fi
-          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          # Collect updates into array
+          updates=()
 
-          # Check if update is needed
-          if [ "$CURRENT_VERSION" != "$NEW_VERSION" ]; then
-            echo "needs_update=true" >> "$GITHUB_OUTPUT"
-            echo "Update needed: $CURRENT_VERSION -> $NEW_VERSION"
+          # Determine which editions to check
+          if [ -n "$INPUT_EDITION" ]; then
+            editions_to_check=("$INPUT_EDITION")
           else
-            echo "needs_update=false" >> "$GITHUB_OUTPUT"
-            echo "Already at latest version: $CURRENT_VERSION"
+            editions_to_check=("cliproxyapi" "cliproxyapi-plus" "cliproxyapi-business")
           fi
 
-  update-flake:
+          for edition in "${editions_to_check[@]}"; do
+            repo="${REPOS[$edition]}"
+
+            echo "Checking $edition ($repo)..."
+
+            # Extract current version from flake.nix using perl multiline match
+            # The /s modifier allows . to match newlines
+            current_version=$(perl -0ne 'print $1 if /'"$edition"' = \{[^}]*?version = "([^"]+)"/s' flake.nix)
+
+            if [ -z "$current_version" ]; then
+              echo "Warning: Could not extract version for $edition, skipping"
+              continue
+            fi
+
+            echo "  Current version: $current_version"
+
+            # Determine target version
+            if [ -n "$INPUT_EDITION" ] && [ -n "$INPUT_VERSION" ]; then
+              # Use specified version for specific edition
+              new_version="$INPUT_VERSION"
+            else
+              # Fetch latest from GitHub API with authentication
+              new_version=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+                "https://api.github.com/repos/$repo/releases/latest" | \
+                jq -r '.tag_name' | sed 's/^v//')
+            fi
+
+            if [ -z "$new_version" ]; then
+              echo "Warning: Could not fetch latest version for $edition, skipping"
+              continue
+            fi
+
+            echo "  Latest version: $new_version"
+
+            # Check if update is needed
+            if [ "$current_version" != "$new_version" ]; then
+              echo "  Update needed: $current_version -> $new_version"
+              updates+=("{\"edition\":\"$edition\",\"new_version\":\"$new_version\",\"current_version\":\"$current_version\",\"repo\":\"$repo\"}")
+            else
+              echo "  Already at latest version"
+            fi
+          done
+
+          # Build JSON matrix output
+          if [ ${#updates[@]} -eq 0 ]; then
+            matrix='{"include":[]}'
+          else
+            # Join updates with commas and wrap in include array
+            updates_json=$(IFS=,; echo "${updates[*]}")
+            matrix="{\"include\":[$updates_json]}"
+          fi
+
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo ""
+          echo "Matrix output: $matrix"
+
+  update-edition:
+    needs: check-updates
+    if: fromJson(needs.check-updates.outputs.matrix).include[0] != null
     runs-on: ubuntu-latest
-    needs: check-update
-    if: needs.check-update.outputs.needs_update == 'true'
+    strategy:
+      matrix: ${{ fromJson(needs.check-updates.outputs.matrix) }}
+      fail-fast: false
 
     steps:
       - name: Checkout repository
@@ -70,27 +134,24 @@ jobs:
             experimental-features = nix-command flakes
 
       - name: Update version and hashes
-        id: update
-        env:
-          NEW_VERSION: ${{ needs.check-update.outputs.new_version }}
         run: |
           chmod +x scripts/update-version.sh
-          ./scripts/update-version.sh "$NEW_VERSION"
+          ./scripts/update-version.sh "${{ matrix.edition }}" "${{ matrix.new_version }}"
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: update CLIProxyAPI to v${{ needs.check-update.outputs.new_version }}"
-          title: "chore: update CLIProxyAPI to v${{ needs.check-update.outputs.new_version }}"
+          commit-message: "chore: update ${{ matrix.edition }} to v${{ matrix.new_version }}"
+          title: "chore: update ${{ matrix.edition }} to v${{ matrix.new_version }}"
           body: |
-            Automated update of CLIProxyAPI from v${{ needs.check-update.outputs.current_version }} to v${{ needs.check-update.outputs.new_version }}.
+            Automated update of ${{ matrix.edition }} from v${{ matrix.current_version }} to v${{ matrix.new_version }}.
 
-            **Release notes:** https://github.com/router-for-me/CLIProxyAPI/releases/tag/v${{ needs.check-update.outputs.new_version }}
+            **Release notes:** https://github.com/${{ matrix.repo }}/releases/tag/v${{ matrix.new_version }}
 
             ---
             *This PR was automatically created by the update workflow.*
-          branch: update/cliproxyapi-${{ needs.check-update.outputs.new_version }}
+          branch: update/${{ matrix.edition }}-${{ matrix.new_version }}
           delete-branch: true
           labels: |
             automated
