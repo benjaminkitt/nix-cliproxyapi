@@ -42,12 +42,12 @@
           homepage = "https://github.com/router-for-me/CLIProxyAPI";
         };
         cliproxyapi-plus = {
-          version = "6.8.27-0";
+          version = "6.8.28-1";
           hashes = {
-            "x86_64-linux" = "sha256-aR11xzf6peNQcNDNCOmUC+qyYs4osInhmhBZ8gIXC5k=";
-            "aarch64-linux" = "sha256-5fSeOrA0UqDhoCpaQwavwPx/vA/3sq+VsKh6DAVChCM=";
-            "x86_64-darwin" = "sha256-IDpX/YVwX5RYrP1IcG7HOC/5zalCTyt7492AqPxcLBI=";
-            "aarch64-darwin" = "sha256-gN7HCQ0Aed5PkchejiGoHogkSCJFun24vWyeJ3MRmEY=";
+            "x86_64-linux" = "sha256-lTM6/FjHsi7vgJHsSYtz6ajhiHklC/qkWpi1bVsGOKE=";
+            "aarch64-linux" = "sha256-aamCGQ8Zu7ooho/TswC3MPyWxYBGwWpqoG2NUI6Cgpg=";
+            "x86_64-darwin" = "sha256-mEltGpbIN+lHLdTJ5slrDfBz1tE4WnNKNSKMLCw2EeI=";
+            "aarch64-darwin" = "sha256-hIfr5bowG6P9tyTxfs2Ozp9seMK2xTfNNjrwEhJrJuw=";
           };
           repo = "router-for-me/CLIProxyAPIPlus";
           archivePrefix = "CLIProxyAPIPlus";
